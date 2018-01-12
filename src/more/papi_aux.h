@@ -3,6 +3,6 @@
 
 int papi_init (void);
 int papi_start(void);
-void print_papi(int);
+void print_papi(int, FILE *_fd);
 
 #endif

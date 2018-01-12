@@ -37,7 +37,7 @@ int papi_start() {
 }
 
 
-void print_papi(int size){
+void print_papi(int size, FILE *_fd){
     /* Stop counting events */
     if (PAPI_stop_counters(values, NUM_EVENTS) != PAPI_OK) {
       printf ("PAPI error stoping counters!\n");
@@ -55,6 +55,7 @@ void print_papi(int size){
 
       if (PAPI_event_code_to_name(Events[i], EventCodeStr) == PAPI_OK) {
         printf (";%lld", min_values[i]);
+        fprintf(_fd,",%lld", min_values[i]);
       } else {
         printf ("PAPI UNKNOWN EVENT = %lld\n", min_values[i]);
       }
