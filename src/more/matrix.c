@@ -40,8 +40,8 @@ void free_matrix(float ** _matrix,int _lines){
 
 void printhelp(){
     printf("Calculates matrices multiplication\n");
-    printf("Usage: dotmatrix [SIZE]\n");
-  printf("If size is not specified, taken as default 5\n");
+    printf("Usage: dotmatrix [size] [# of iteractions]\n");
+    printf("If size is not specified, size is 32 and iteractions 8\n");
     exit(1);
 }
 
