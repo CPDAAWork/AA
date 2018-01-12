@@ -15,7 +15,6 @@
 #define SIZE 32
 
 long long unsigned timer1,timer2;
-FILE *fd;
 
 /*##############################################################################
  *
@@ -27,9 +26,6 @@ FILE *fd;
  *    I-J-K NORMAL
  ***********************/
 void dotMulti_ijk(float **_matrixA, float **_matrixB, float **_matrixC, int _height, int _width){
-  #ifdef OMP
-    #pragma omp parallel for
-  #endif
   for (int i=0;i<_height;i++)
     for (int j=0;j<_width;j++)
       for (int k=0;k<_width;k++)
@@ -40,9 +36,6 @@ void dotMulti_ijk(float **_matrixA, float **_matrixB, float **_matrixC, int _hei
  *    I-K-J NORMAL
  ***********************/
 void dotMulti_ikj(float **_matrixA, float **_matrixB, float **_matrixC, int _height, int _width){
-  #ifdef OMP
-    #pragma omp parallel for
-  #endif
   for (int i=0;i<_height;i++)
     for (int k=0;k<_width;k++)
       for (int j=0;j<_width;j++)
@@ -53,9 +46,6 @@ void dotMulti_ikj(float **_matrixA, float **_matrixB, float **_matrixC, int _hei
  *    I-K-J NORMAL
  ***********************/
 void dotMulti3(float **_matrixA, float **_matrixB, float **_matrixC, int _height, int _width){
-  #ifdef OMP
-    #pragma omp parallel for
-  #endif
   for (int j=0;j<_height;j++)
     for (int k=0;k<_width;k++)
       for (int i=0;i<_width;i++)
@@ -79,9 +69,6 @@ long long dotMulti_ijk_T(float **_matrixA, float **_matrixB, float **_matrixC, i
   tB = transposeMatrix(_matrixB,_height,_width);
 
   time_1 = PAPI_get_real_usec();
-  #ifdef OMP
-    #pragma omp parallel for
-  #endif
   for (int i=0;i<_height;i++)
     for (int j=0;j<_width;j++)
       for (int k=0;k<_width;k++)
@@ -94,18 +81,44 @@ long long dotMulti_ijk_T(float **_matrixA, float **_matrixB, float **_matrixC, i
 }
 
 /***********************
+ *    J-K-J TRANSPOSE
+ ***********************/
+long long dotMulti_jki_T(float **_matrixA, float **_matrixB, float **_matrixC, int _height, int _width){
+  float **tB, **tA, **tC;
+  long long time_1=0,time_2=0;
+
+  tA = transposeMatrix(_matrixA,_height,_width);
+  tB = transposeMatrix(_matrixB,_height,_width);
+  tC = transposeMatrix(_matrixC,_height,_width);
+
+  time_1 = PAPI_get_real_usec();
+  for (int j=0;j<_height;j++)
+    for (int k=0;k<_width;k++)
+      for (int i=0;i<_width;i++)
+        _matrixC[i][j]+=tA[k][i]*tB[j][k];
+  time_2 = PAPI_get_real_usec();
+
+  float aux** = _matrixC;
+  _matrixC = transposeMatrix(tC,_height,_width);
+  tC = arx;
+
+  free_matrix(tA,_width);
+  free_matrix(tB,_width);
+
+  return (time_2-time_1);
+}
+
+/***********************
  *    K-I-J TRANSPOSE
  ***********************/
-long long dotMulti2_T(float **_matrixA, float **_matrixB, float **_matrixC, int _height, int _width){
+/*
+long long dotMulti_kij_T(float **_matrixA, float **_matrixB, float **_matrixC, int _height, int _width){
   float **tA;
   long long time_1=0,time_2=0;
 
   tA = transposeMatrix(_matrixA,_height,_width);
 
   time_1 = PAPI_get_real_usec();
-  #ifdef OMP
-    #pragma omp parallel for
-  #endif
   for (int k=0;k<_height;k++)
     for (int i=0;i<_width;i++)
       for (int j=0;j<_width;j++)
@@ -116,32 +129,7 @@ long long dotMulti2_T(float **_matrixA, float **_matrixB, float **_matrixC, int 
 
   return (time_2-time_1);
 }
-
-/***********************
- *    J-K-I TRANSPOSE
- ***********************/
-long long dotMulti3_T(float **_matrixA, float **_matrixB, float **_matrixC, int _height, int _width){
-  float **tB, **tA;
-  long long time_1=0,time_2=0;
-
-  tA = transposeMatrix(_matrixA,_height,_width);
-  tB = transposeMatrix(_matrixB,_height,_width);
-
-  time_1 = PAPI_get_real_usec();
-  #ifdef OMP
-    #pragma omp parallel for
-  #endif
-  for (int j=0;j<_height;j++)
-    for (int k=0;k<_width;k++)
-      for (int i=0;i<_width;i++)
-        _matrixC[i][j]+=tA[k][i]*tB[j][k];
-  time_2 = PAPI_get_real_usec();
-
-  free_matrix(tA,_width);
-  free_matrix(tB,_width);
-
-  return (time_2-time_1);
-}
+*/
 /*##############################################################################
  *
  *    BLOCK FORM
@@ -191,24 +179,28 @@ void multi_ijk(float **_matrixA, float **_matrixB, float **_matrixC,int i_start,
   int i_stop = i_start+block_size;
   int j_stop = j_start+block_size;
   int k_stop = k_start+block_size;
-  #ifdef OMP
-    #pragma omp parallel for
-  #endif
   for (int i=i_start;i<i_stop;i++)
     for (int k=k_start;k<k_stop;k++)
       #pragma GCC ivdep
       for (int j=j_start;j<j_stop;j++)
         _matrixC[i][j]+=_matrixA[i][k]*_matrixB[k][j];
 }
-void dotMulti_block_ijk_ikj(float **_matrixA, float **_matrixB, float **_matrixC,int block_size,int size){
-  #ifdef OMP
-    #pragma omp parallel for
-  #endif
-  for(int i=0; i<size; i+=block_size)
-    for(int j=0; j<size; j+=block_size)
-      for(int k=0; k<size; k+=block_size)
-        multi_ijk(_matrixA,_matrixB,_matrixC,i,j,k,block_size);
+long long dotMulti_ijk_ikj_B(float **_matrixA, float **_matrixB, float **_matrixC,int _block_size,int _size){
+  float ** tB;
+  long long time_1=0;
+  long long time_2=0;
 
+  tB = transposeMatrix(_matrixB,_size,_size);
+  for(int i=0; i<_size; i+=_block_size)
+    for(int j=0; j<_size; j+=_block_size)
+      for(int k=0; k<_size; k+=_block_size)
+        multi_ijk(_matrixA,_matrixB,_matrixC,i,j,k,_block_size);
+
+  time_2 = PAPI_get_real_usec();
+
+  free_matrix(tB,_size);
+
+  return time_2-time_1;
 }
 
 /**************************************************
@@ -217,9 +209,6 @@ void dotMulti_block_ijk_ikj(float **_matrixA, float **_matrixB, float **_matrixC
 void multi_kij(float ** _matrixA, float ** _matrixB, float ** _matrixC, int k_start, int i_start,int block, int size){
   int k_stop = k_start + block;
   int i_stop = i_start + block;
-  #ifdef OMP
-    #pragma omp parallel for
-  #endif
   for (int k=k_start;k<k_stop;++k){
     for (int i=i_start;i<i_stop;++i){
       float aik=_matrixA[i][k];
@@ -230,7 +219,7 @@ void multi_kij(float ** _matrixA, float ** _matrixB, float ** _matrixC, int k_st
     }
   }
 }
-void dotMulti2(float ** A, float ** B, float ** C,int block, int size){
+void dotMulti_kij_ik_B(float ** A, float ** B, float ** C,int block, int size){
   for(int i=0;i<size;i+=block){
     for(int k=0;k<size;k+=block){
       multi_kij(A,B,C,k,i,block,size);
@@ -273,17 +262,10 @@ int main(int argc, char *argv[]){
 
   int size = 32;
   int iter = 1;
-  
-  char repFile[] = "relatorio.csv";
   if(argc>1)
     size = atoi(argv[1]);
   if(argc>2)
     iter = atoi(argv[2]);
-  fd = fopen(repFile, "a");
-  if (fd==NULL){
-    fprintf(stderr, "Problem trying to open file for saving report!\n");
-    exit(1);
-  }
 
   float **A = allocArray(size,size);
   float **B = allocArray(size,size);
@@ -309,8 +291,7 @@ int main(int argc, char *argv[]){
     timer2 = PAPI_get_real_usec();
 
     printf("%lld", (timer2-timer1));
-    fprintf(fd,"%lld",(timer2-timer1));
-    print_papi(size,fd);
+    print_papi(size);
   }
   for (int h=0;h<size;h++){
     free(A[h]);
