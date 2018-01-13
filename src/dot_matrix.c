@@ -12,13 +12,13 @@
 #include "more/matrix.h"
 #include "more/papi_aux.h"
 
-#define ITER 8
-
 typedef unsigned long long type_time;
 typedef float flop_type;
 
 type_time (*func)(flop_type **, flop_type **,flop_type **,int,int);
 FILE *fd;
+int size = 32;
+int iter = 1;
 
 /*##############################################################################
  *
@@ -34,14 +34,18 @@ type_time dotMulti_ijk(flop_type **_matrixA, flop_type **_matrixB,
 {
   type_time time_1=0;
   type_time time_2=0;
-
+  int sum;
   time_1 = PAPI_get_real_usec();
-
-  #pragma omp parallel for
+  #ifdef OMP
+    #pragma omp parallel for
+  #endif
   for (int i=0;i<_height;++i)
-    for (int j=0;j<_width;++j)
+    for (int j=0;j<_width;++j){
+      sum=0;
       for (int k=0;k<_width;++k)
-        _matrixC[i][j]+=_matrixA[i][k]*_matrixB[k][j];
+        sum+=_matrixA[i][k]*_matrixB[k][j];
+      _matrixC[i][j] = sum;
+    }
   time_2 = PAPI_get_real_usec();
 
   return time_2-time_1;
@@ -57,11 +61,15 @@ type_time dotMulti_ikj(flop_type **_matrixA, flop_type **_matrixB,
   type_time time_2=0;
 
   time_1 = PAPI_get_real_usec();
-  #pragma omp parallel for
+  #ifdef OMP
+    #pragma omp parallel for
+  #endif
   for (int i=0;i<_height;++i)
     for (int k=0;k<_width;++k)
       for (int j=0;j<_width;++j)
         _matrixC[i][j]+=_matrixA[i][k]*_matrixB[k][j];
+    
+
   time_2 = PAPI_get_real_usec();
 
   return time_2-time_1;
@@ -77,7 +85,9 @@ type_time dotMulti_jki(flop_type **_matrixA, flop_type **_matrixB,
   type_time time_2=0;
 
   time_1 = PAPI_get_real_usec();
-  #pragma omp parallel for
+  #ifdef OMP
+    #pragma omp parallel for
+  #endif
   for (int j=0;j<_height;++j)
     for (int k=0;k<_width;++k)
       for (int i=0;i<_width;++i)
@@ -103,13 +113,20 @@ type_time dotMulti_ijk_T(flop_type **_matrixA, flop_type **_matrixB,
   type_time time_1=0;
   type_time time_2=0;
   tB = transposeMatrix(_matrixB,_height,_width);
+  int sum;
 
   time_1 = PAPI_get_real_usec();
-  #pragma omp parallel for
+  #ifdef OMP
+    #pragma omp parallel for
+  #endif
   for (int i=0;i<_height;++i)
-    for (int j=0;j<_width;++j)
+    for (int j=0;j<_width;++j){
+      sum=0;
       for (int k=0;k<_width;++k)
-        _matrixC[i][j]+=_matrixA[i][k]*tB[j][k];
+        sum+=_matrixA[i][k]*tB[j][k];
+      _matrixC[i][j]=sum;
+    }
+
   time_2 = PAPI_get_real_usec();
 
   free_matrix(tB,_width);
@@ -129,7 +146,9 @@ type_time dotMulti_jki_T(flop_type **_matrixA, flop_type **_matrixB,
   tC = transposeMatrix(_matrixC,_height,_width);
 
   time_1 = PAPI_get_real_usec();
-  #pragma omp parallel for
+  #ifdef OMP
+    #pragma omp parallel for
+  #endif
   for (int j=0;j<_height;++j)
     for (int k=0;k<_width;++k)
       for (int i=0;i<_width;++i)
@@ -179,7 +198,9 @@ type_time bijk(flop_type **A, flop_type **B, flop_type **C, int _block_size, int
   tB = transposeMatrix(B,_size,_size);
 
   time_1 = PAPI_get_real_usec();
-  #pragma omp parallel for
+  #ifdef OMP
+    #pragma omp parallel for
+  #endif
   for (kk = 0; kk < _size; kk += _block_size) {
       for (jj = 0; jj < _size; jj += _block_size) {
         for (i = 0; i < _size; ++i) {
@@ -220,7 +241,9 @@ type_time dotMulti_ijk_B_ijk(flop_type **_matrixA, flop_type **_matrixB,
   tB = transposeMatrix(_matrixB,_size,_size);
 
   time_1 = PAPI_get_real_usec();
-  #pragma omp parallel for
+  #ifdef OMP
+    #pragma omp parallel for
+  #endif
   for(int j = 0; j<_size; j+= _block_size)
     for(int i = 0; i<_size; i+= _block_size)
       for(int k = 0; k<_size; k+= _block_size)
@@ -244,10 +267,14 @@ void multi_ijk(flop_type **_matrixA, flop_type **_matrixB, flop_type **_matrixC,
 {
   int i_stop = i_start+_block_size;
   int j_stop = j_start+_block_size;
-  #pragma omp parallel for
+  #ifdef OMP
+    #pragma omp parallel for
+  #endif
   for (int i=i_start;i<i_stop;++i)
     for (int j=j_start;j<j_stop;++j)
-      #pragma GCC ivdep
+      #ifdef VEC
+        #pragma GCC ivdep
+      #endif
       for (int k=0;k<_size;++k)
         _matrixC[i][j]+=_matrixA[i][k]*_matrixB[j][k];
 }
@@ -258,11 +285,15 @@ void multi_kij(flop_type ** _matrixA, flop_type ** _matrixB, flop_type ** _matri
 {
   int k_stop = k_start + _block_size;
   int i_stop = i_start + _block_size;
-  #pragma omp parallel for
+  #ifdef OMP
+    #pragma omp parallel for
+  #endif
   for (int k=k_start;k<k_stop;++k){
     for (int i=i_start;i<i_stop;++i){
       flop_type aik=_matrixA[i][k];
-      #pragma GCC ivdep
+      #ifdef VEC
+        #pragma GCC ivdep
+      #endif
       for (int j=0;j<_size;++j){
         _matrixC[i][j]+=aik*_matrixB[k][j];
       }
@@ -276,11 +307,15 @@ void multi_ikj(flop_type ** _matrixA, flop_type ** _matrixB, flop_type ** _matri
 {
   int k_stop = k_start + _block_size;
   int i_stop = i_start + _block_size;
-  #pragma omp parallel for
+  #ifdef OMP
+    #pragma omp parallel for
+  #endif
   for (int i=i_start;i<i_stop;++i)
     for (int k=k_start;k<k_stop;++k){
       flop_type aik=_matrixA[i][k];
-      #pragma GCC ivdep
+      #ifdef VEC
+        #pragma GCC ivdep
+      #endif
       for (int j=0;j<_size;++j)
         _matrixC[i][j]+=aik*_matrixB[k][j];
     }
@@ -298,7 +333,9 @@ type_time dotMulti_ji_B_ijk(flop_type **_matrixA, flop_type **_matrixB,
   tB = transposeMatrix(_matrixB,_size,_size);
 
   time_1 = PAPI_get_real_usec();
-  #pragma omp parallel for
+  #ifdef OMP
+    #pragma omp parallel for
+  #endif
   for(int j = 0; j<_size; j+= _block_size)
     for(int i = 0; i<_size; i+= _block_size)
       multi_ijk(_matrixA,_matrixB,_matrixC,i,j,0,_block_size,_size);
@@ -320,7 +357,9 @@ type_time dotMulti_ij_B_ikj(flop_type **_matrixA, flop_type **_matrixB,
   tB = transposeMatrix(_matrixB,_size,_size);
 
   time_1 = PAPI_get_real_usec();
-  #pragma omp parallel for
+  #ifdef OMP
+    #pragma omp parallel for
+  #endif
   for(int i=0; i<_size; i+=_block_size)
     for(int j=0; j<_size; j+=_block_size)
       multi_ijk(_matrixA,_matrixB,_matrixC,i,j,0,_block_size,_size);
@@ -339,7 +378,9 @@ type_time dotMulti_ik_B_ikj(flop_type **_matrixA, flop_type **_matrixB,
   tB = transposeMatrix(_matrixB,_size,_size);
 
   time_1 = PAPI_get_real_usec();
-  #pragma omp parallel for
+  #ifdef OMP
+    #pragma omp parallel for
+  #endif
   for(int i = 0; i<_size; i+= _block_size)
     for(int k = 0; k<_size; k+= _block_size)
       multi_ikj(_matrixA,_matrixB,_matrixC,i,0,k,_block_size,_size);
@@ -359,7 +400,9 @@ type_time dotMulti_ik_B_kij(flop_type ** A, flop_type ** B, flop_type ** C,
   type_time time_2=0;
  
   time_1 = PAPI_get_real_usec();
-  #pragma omp parallel for
+  #ifdef OMP
+    #pragma omp parallel for
+  #endif
   for(int i=0; i<_size; i+=_block_size)
     for(int k=0; k<_size; k+=_block_size)
       multi_kij(A,B,C,i,0,k,_block_size,_size);
@@ -411,10 +454,14 @@ type_time dotMulti_ikj_V(flop_type **_matrixA, flop_type **_matrixB,
   type_time time_2=0;
 
   time_1 = PAPI_get_real_usec();
-  #pragma omp parallel for
+  #ifdef OMP
+    #pragma omp parallel for
+  #endif
   for (int i=0;i<_height;++i)
     for (int k=0;k<_width;++k)
-      #pragma GCC ivdep
+      #ifdef VEC
+        #pragma GCC ivdep
+      #endif
       for (int j=0;j<_width;++j)
         _matrixC[i][j]+=_matrixA[i][k]*_matrixB[k][j];
   time_2 = PAPI_get_real_usec();
@@ -430,7 +477,7 @@ int exec_Function(flop_type **_matrixA, flop_type **_matrixB,
   if(papi_init() == 0)
     return -1;
 
-  for(int i = 0; i<ITER; i++){
+  for(int i = 0; i<iter; i++){
     clearCache();
     if(papi_start() == 0)
       return -1;
@@ -438,20 +485,23 @@ int exec_Function(flop_type **_matrixA, flop_type **_matrixB,
     timer=func(_matrixA,_matrixB,_matrixC,_height,_width);
 
     printf("%lld", (timer));
-    print_papi(_width);
+    print_papi(_width,fd);
   }
   return 1;
 }
 
 int main(int argc, char *argv[]){
   int diff = 0;
-  int size = 32;
-  int iter = 1;
+  char repFile[] = "relatorio.csv";
+
   if(argc>1)
     size = atoi(argv[1]);
   if(argc>2)
     iter = atoi(argv[2]);
-
+  if (fd==NULL){
+    fprintf(stderr, "Problem trying to open file for saving report!\n");
+    exit(1);
+  }
   flop_type **A = allocArray(size,size);
   flop_type **B = allocArray(size,size);
   flop_type **C = allocArray(size,size);
@@ -471,7 +521,7 @@ int main(int argc, char *argv[]){
   exec_Function(A,B,C,32,size);
   //printMatrix(C,size,size);
 
-  diff = comp_matrices(C,C2,size);
+  //diff = comp_matrices(C,C2,size);
   printf("Diff %d\n",diff);
 
   printf("Block Vec ik-ikj\n");
@@ -479,7 +529,7 @@ int main(int argc, char *argv[]){
   exec_Function(A,B,C,32,size);
   //printMatrix(C,size,size);
 
-  diff = comp_matrices(C,C2,size);
+  //diff = comp_matrices(C,C2,size);
   printf("Diff %d\n",diff);
 
   for (int h=0;h<size;h++){

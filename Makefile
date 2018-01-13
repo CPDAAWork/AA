@@ -6,10 +6,14 @@ CC = gcc
 
 
 
-CFLAGS = -Wall -Wextra -std=c99 -O2 -ftree-vectorize -fopt-info-vec -march=native
+CFLAGS = -Wall -Wextra -std=c99 -O2 -march=native
 
 ifeq ($(OMP),yes)
 	CFLAGS += -DOMP -fopenmp
+endif
+
+ifeq ($(VEC),yes)
+	CFLAGS += -DVEC -ftree-vectorize -fopt-info-vec
 endif
 
 MORE = src/more/matrix.c src/more/papi_aux.c
