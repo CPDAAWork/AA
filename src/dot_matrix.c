@@ -485,6 +485,7 @@ int exec_Function(flop_type **_matrixA, flop_type **_matrixB,
     timer=func(_matrixA,_matrixB,_matrixC,_height,_width);
 
     printf("%lld", (timer));
+    fprintf(fd,"%lld",(timer));
     print_papi(_width,fd);
   }
   return 1;
